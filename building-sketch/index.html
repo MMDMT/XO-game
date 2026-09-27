@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ساختمان بالکن مثلثی</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@600;700&family=Vazirmatn:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --paper: #e5e8e1;
+    --panel: rgba(247, 248, 244, 0.9);
+    --panel-solid: #f7f8f4;
+    --ink: #1d2320;
+    --muted: #59625c;
+    --line: #c4cac1;
+    --accent: #3b6846;
+    --accent-ink: #f3f7f1;
+    --shadow: 0 12px 32px rgba(29, 35, 32, 0.12);
+    --scene-bg: #e5e8e1;
+    --scene-ground: #e2e5dd;
+    --scene-grid: #c3cabd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #141817;
+      --panel: rgba(28, 33, 31, 0.88);
+      --panel-solid: #1c211f;
+      --ink: #e4e9e3;
+      --muted: #9ba49d;
+      --line: #333b37;
+      --accent: #8cc097;
+      --accent-ink: #10231a;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      --scene-bg: #141817;
+      --scene-ground: #1d2321;
+      --scene-grid: #2e3733;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #141817;
+    --panel: rgba(28, 33, 31, 0.88);
+    --panel-solid: #1c211f;
+    --ink: #e4e9e3;
+    --muted: #9ba49d;
+    --line: #333b37;
+    --accent: #8cc097;
+    --accent-ink: #10231a;
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    --scene-bg: #141817;
+    --scene-ground: #1d2321;
+    --scene-grid: #2e3733;
+  }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--paper);
+    color: var(--ink);
+    font: 14px/1.6 "Vazirmatn", Tahoma, "Segoe UI", sans-serif;
+  }
+  [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; }
+
+  #app { position: relative; height: 100%; overflow: hidden; }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+  /* Annotations pinned to the model, like the notes on the sketch */
+  #tags { position: absolute; inset: 0; pointer-events: none; }
+  .tag { position: absolute; left: 0; top: 0; display: flex; align-items: center; direction: ltr; transition: opacity .25s; }
+  .tag.flip { flex-direction: row-reverse; }
+  .tag.behind { opacity: .3; }
+  .tag .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2.5px var(--panel-solid); }
+  .tag .stem { flex: none; width: 14px; height: 1.5px; background: var(--ink); }
+  .tag .txt {
+    direction: rtl; white-space: nowrap;
+    font-size: 12.5px; font-weight: 500; line-height: 1;
+    padding: 6px 10px 7px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+  }
+
+  /* Info panel */
+  .panel {
+    position: absolute; top: 16px; inset-inline-start: 16px;
+    width: min(360px, calc(100% - 32px));
+    max-height: calc(100% - 150px); overflow: auto;
+    background: var(--panel);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .panel summary { position: relative; list-style: none; cursor: pointer; padding: 14px 16px 12px; padding-inline-end: 44px; }
+  .panel summary::-webkit-details-marker { display: none; }
+  .panel summary::after {
+    content: ""; position: absolute; top: 25px; inset-inline-end: 19px;
+    width: 8px; height: 8px;
+    border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg); transition: transform .2s;
+  }
+  .panel[open] summary::after { transform: rotate(-135deg); top: 29px; }
+  .panel summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 14px; }
+  .eyebrow { display: block; font-size: 12px; color: var(--muted); }
+  h1 { margin: 2px 0 0; font: 700 21px/1.45 "Noto Kufi Arabic", "Vazirmatn", Tahoma, sans-serif; text-wrap: balance; }
+
+  .panel-body { display: grid; gap: 16px; padding: 14px 16px 16px; border-top: 1px solid var(--line); }
+  .lede { margin: 0; font-size: 13.5px; }
+  .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .legend li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: start; font-size: 12.5px; line-height: 1.65; color: var(--muted); }
+  .legend b { display: block; color: var(--ink); font-size: 13px; font-weight: 700; }
+  .sw { width: 20px; height: 20px; border-radius: 5px; margin-top: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2); }
+  .sw-wood { background: repeating-linear-gradient(90deg, #5b3a2c 0 3px, #734b38 3px 5px); }
+  .sw-gray { background: repeating-linear-gradient(0deg, #86837a 0 4px, #9d9a90 4px 5px); }
+  .sw-plant { background: radial-gradient(circle at 30% 35%, #74a552 0 4px, transparent 4.5px), radial-gradient(circle at 70% 70%, #5c8f44 0 5px, transparent 5.5px), #3d6a33; }
+  .sw-plaster { background: #ece5d8; }
+  .sw-glass { background: linear-gradient(135deg, #8aa3ad, #34505c); }
+
+  .depths { display: grid; gap: 10px; }
+  .group-title { margin: 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .slider { display: grid; gap: 2px; }
+  .slider label { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .slider output { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .slider input { width: 100%; margin: 0; accent-color: var(--accent); }
+  .note, .hint { margin: 0; font-size: 12px; line-height: 1.75; color: var(--muted); }
+
+  /* Bottom dock */
+  .dock {
+    position: absolute; inset-inline: 16px; bottom: 16px;
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: flex-end;
+    pointer-events: none;
+  }
+  .dock > * { pointer-events: auto; }
+  .seg {
+    display: flex; gap: 2px; padding: 4px; max-width: 100%; overflow-x: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  .seg button { flex: none; border: 0; background: transparent; padding: 7px 13px; border-radius: 8px; font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .seg button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .toggles button {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel); font-size: 13px; cursor: pointer; box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  .toggles button::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--muted); box-sizing: border-box; }
+  .toggles button[aria-pressed="true"]::before { background: var(--accent); border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  #status { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; font-size: 15px; color: var(--muted); pointer-events: none; }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 18px; }
+    .hint { display: none; }
+    .seg { width: 100%; }
+    .seg button { flex: 1 0 auto; padding: 7px 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tag, .panel summary::after { transition: none; }
+  }
+</style>
+
+<div id="app" dir="rtl" lang="fa">
+  <canvas id="view" aria-label="مدل سه‌بعدی ساختمان. برای چرخاندن بکشید."></canvas>
+
+  <div id="tags" aria-hidden="true">
+    <div class="tag" data-key="louvre" hidden><i class="dot"></i><i class="stem"></i><span class="txt">لوورهای چوبی</span></div>
+    <div class="tag" data-key="balcony" hidden><i class="dot"></i><i class="stem"></i><span class="txt">بالکن بزرگ</span></div>
+    <div class="tag" data-key="rail" hidden><i class="dot"></i><i class="stem"></i><span class="txt">نردهٔ چوبی</span></div>
+    <div class="tag" data-key="planter" hidden><i class="dot"></i><i class="stem"></i><span class="txt">گلدان‌های چوبی و گیاه</span></div>
+  </div>
+
+  <details id="info" class="panel" open>
+    <summary>
+      <span class="eyebrow">اسکچ سه‌بعدی از روی طرح نما</span>
+      <h1>ساختمان بالکن مثلثی</h1>
+    </summary>
+    <div class="panel-body">
+      <p class="lede">طرح دستی نما، این بار با عمق. مدل را بچرخانید، زوم کنید یا یکی از زاویه‌های آماده را بزنید.</p>
+
+      <ul class="legend">
+        <li><i class="sw sw-wood"></i><span><b>چوب قهوه‌ای</b>لوورهای عمودی گوشهٔ بالا و نردهٔ بالکن. فاصلهٔ بین تیغه‌ها فرورفتگی به رنگ ساختمان است.</span></li>
+        <li><i class="sw sw-gray"></i><span><b>چوب طوسی</b>گلدان‌های افقی در مثلث پایین.</span></li>
+        <li><i class="sw sw-plant"></i><span><b>گیاهان سبز</b>نوارهای خالی بین گلدان‌ها را پر می‌کنند.</span></li>
+        <li><i class="sw sw-plaster"></i><span><b>رنگ اصلی ساختمان</b>بدنه و همهٔ فرورفتگی‌ها.</span></li>
+        <li><i class="sw sw-glass"></i><span><b>شیشه</b>درِ بالکن. در طرح نبود؛ برای اینکه بالکن خوانا باشد اضافه شده.</span></li>
+      </ul>
+
+      <div class="depths">
+        <p class="group-title">عمق‌ها (در طرح نیامده؛ خودتان تنظیم کنید)</p>
+        <div class="slider">
+          <label for="depth">عمق ساختمان <output id="depthOut" for="depth">۱۱٫۷ متر</output></label>
+          <input id="depth" type="range" min="6" max="14" step="0.5" value="9">
+        </div>
+        <div class="slider">
+          <label for="bdepth">عمق بالکن <output id="bdepthOut" for="bdepth">۴٫۴ متر</output></label>
+          <input id="bdepth" type="range" min="1.5" max="7.5" step="0.1" value="3.4">
+        </div>
+      </div>
+
+      <p class="note">مقیاس فرضی: هر خانهٔ شطرنجی کف برابر یک خانهٔ کاغذ طرح است، حدود ۱٫۳ متر. با این مقیاس نما ۱۳ متر عرض و ۲۰٫۸ متر ارتفاع دارد. آدمک جلوی ساختمان ۱٫۷۵ متر است.</p>
+      <p class="hint">کشیدن: چرخش · اسکرول یا دو انگشت: زوم · راست‌کلیک: جابه‌جایی</p>
+    </div>
+  </details>
+
+  <div class="dock">
+    <div class="seg" role="group" aria-label="زاویهٔ دید">
+      <button type="button" data-view="front" aria-pressed="false">روبه‌رو، مثل طرح</button>
+      <button type="button" data-view="three" aria-pressed="false">سه‌رخ</button>
+      <button type="button" data-view="side" aria-pressed="false">سمت راست</button>
+      <button type="button" data-view="balcony" aria-pressed="false">داخل بالکن</button>
+    </div>
+    <div class="toggles">
+      <button type="button" id="tLines" aria-pressed="true">خطوط اسکچ</button>
+      <button type="button" id="tTags" aria-pressed="true">برچسب‌ها</button>
+      <button type="button" id="tSpin" aria-pressed="false">چرخش خودکار</button>
+    </div>
+  </div>
+
+  <div id="status" role="status">در حال ساختن مدل…</div>
+</div>
+
+<script>
+  if (matchMedia('(max-width: 640px)').matches) document.getElementById('info').open = false;
+  setTimeout(function () {
+    if (!window.__modelReady) {
+      document.getElementById('status').textContent = 'مدل بارگذاری نشد. اتصال اینترنت را بررسی کنید و صفحه را دوباره باز کنید.';
+    }
+  }, 20000);
+</script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  const $ = (s) => document.querySelector(s);
+  const app = $('#app'), canvas = $('#view'), statusEl = $('#status');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const CELL_M = 1.3; // assumed size of one square of the sketch's graph paper, in metres
+  const fa = (n) => n.toLocaleString('fa-IR', { maximumFractionDigits: 1 });
+
+  function rng(seed) {
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* ---------- Facade, read off the sketch ----------
+     1 unit = 1 square of the graph paper. Origin = bottom-left corner of the facade,
+     x to the right, y up, z towards the street (facade plane at z = 0). */
+  const W = 10, H = 16;
+  const R1 = 0.3;      // depth of the louvre recess (top-left triangle)
+  const R2 = 0.9;      // depth of the planter recess (bottom-right triangle)
+  const RAIL_Y = 6.4;  // top of the balcony railing
+  const P = {
+    O: [0, 0], E: [W, 0], TR: [W, H],
+    T1a: [0, H], T1b: [4.4, H], T1c: [0, 11.4], // louvre triangle
+    A: [W, 9.6], B: [2.8, 7.2], C: [W, 5],       // balcony cut
+  };
+  const along = (p, q) => (x) => p[1] + ((q[1] - p[1]) * (x - p[0])) / (q[0] - p[0]);
+  const floorY = along(P.B, P.C);
+  const ceilY = along(P.B, P.A);
+  const hypY = along(P.T1c, P.T1b);
+  const railX0 = P.B[0] + ((RAIL_Y - P.B[1]) * (P.C[0] - P.B[0])) / (P.C[1] - P.B[1]);
+  P.R0 = [railX0, RAIL_Y];
+  const diagX = (y) => P.E[0] + ((P.R0[0] - P.E[0]) * y) / P.R0[1]; // edge of the planter triangle
+  P.Q = [diagX(P.C[1]), P.C[1]];
+
+  const LOUVRES = [[0, 0.5], [1, 1.5], [2, 2.5], [3, 3.5]];
+  const PLANTERS = [[3.95, 5], [1.7, 2.8], [0.22, 0.62]];
+
+  const depthIn = $('#depth'), bdepthIn = $('#bdepth');
+  const state = { D: +depthIn.value, DB: +bdepthIn.value, tags: true };
+
+  /* ---------- Renderer, scene, camera ---------- */
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  } catch (err) {
+    statusEl.textContent = 'مرورگر شما WebGL را اجرا نکرد، برای همین مدل نمایش داده نمی‌شود. صفحه را در Chrome یا Safari به‌روز باز کنید.';
+    throw err;
+  }
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.92;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color();
+  scene.fog = new THREE.Fog(0xffffff, 80, 200);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 600);
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI / 2 - 0.02;
+  controls.minDistance = 4;
+  controls.maxDistance = 140;
+  controls.autoRotateSpeed = 0.7;
+
+  scene.add(new THREE.HemisphereLight(0xf4f2ea, 0xb0ab9e, 1.7)); // sky + light bounced off the ground
+  const sun = new THREE.DirectionalLight(0xfff2e0, 2.0);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 110 });
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.03;
+  scene.add(sun, sun.target);
+
+  /* ---------- Textures ---------- */
+  function canvasTexture(size, draw) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    draw(c.getContext('2d'), size);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return t;
+  }
+  function woodGrain(vertical, seed) {
+    const r = rng(seed);
+    return canvasTexture(256, (g, s) => {
+      g.fillStyle = '#ece7df';
+      g.fillRect(0, 0, s, s);
+      for (let i = 0; i < 90; i++) {
+        const p = r() * s, w = 0.6 + r() * 2.4;
+        g.fillStyle = `rgba(45, 28, 16, ${0.05 + r() * 0.13})`;
+        if (vertical) g.fillRect(p, 0, w, s); else g.fillRect(0, p, s, w);
+      }
+      if (!vertical) { // board joints on the planters
+        g.fillStyle = 'rgba(30, 24, 18, 0.35)';
+        for (let k = 0; k < 4; k++) g.fillRect(0, (k * s) / 4, s, 2);
+      }
+    });
+  }
+
+  const gridCanvas = document.createElement('canvas');
+  gridCanvas.width = gridCanvas.height = 128;
+  const gridTex = new THREE.CanvasTexture(gridCanvas);
+  gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping;
+  gridTex.repeat.set(300, 300);
+  gridTex.colorSpace = THREE.SRGBColorSpace;
+  gridTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  function drawGrid(bg, line) {
+    const g = gridCanvas.getContext('2d');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, 128, 128);
+    g.fillStyle = line;
+    g.fillRect(0, 0, 128, 3);
+    g.fillRect(0, 0, 3, 128);
+    gridTex.needsUpdate = true;
+  }
+
+  /* ---------- Materials ---------- */
+  const solid = (o) => new THREE.MeshStandardMaterial({ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, ...o });
+  const M = {
+    plaster: solid({ color: 0xece5d8, roughness: 0.95, envMapIntensity: 0.5 }),
+    wood: solid({ color: 0x7c4f39, map: woodGrain(true, 7), roughness: 0.72, envMapIntensity: 0.45 }),
+    woodGray: solid({ color: 0xa3a095, map: woodGrain(false, 11), roughness: 0.8, envMapIntensity: 0.45 }),
+    soil: solid({ color: 0x3a2d24, roughness: 1, envMapIntensity: 0.3 }),
+    frame: solid({ color: 0x2c2e2b, roughness: 0.45, metalness: 0.4 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x5a7886, roughness: 0.12, metalness: 0.45, envMapIntensity: 1.6, transparent: true, opacity: 0.93 }),
+    leaf: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, flatShading: true, envMapIntensity: 0.45 }),
+    figure: solid({ color: 0x8f958d, roughness: 0.9, envMapIntensity: 0.4 }),
+    line: new THREE.LineBasicMaterial({ color: 0x2a2521, transparent: true, opacity: 0.78 }),
+  };
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshStandardMaterial({ map: gridTex, roughness: 1, envMapIntensity: 0.2 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set(W / 2, 0, -5); // grid lines land on whole units, so the facade sits on a line
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // 1.75 m scale figure
+  const person = new THREE.Group();
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.78, 4, 12), M.figure);
+  torso.position.y = 0.54;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), M.figure);
+  head.position.y = 1.235;
+  person.add(torso, head);
+  person.traverse((o) => { o.castShadow = true; });
+  person.position.set(2.6, 0, 2.4);
+  scene.add(person);
+
+  /* ---------- Geometry helpers ---------- */
+  function prism(poly, zFront, zBack, mat) {
+    const shape = new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y)));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: zFront - zBack, bevelEnabled: false });
+    geo.translate(0, 0, zBack);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = mesh.receiveShadow = true;
+    return mesh;
+  }
+  const box = (x0, x1, y0, y1, zFront, zBack, mat) => prism([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], zFront, zBack, mat);
+  const band = (xa, xb, lo, hi) => [[xa, lo(xa)], [xb, lo(xb)], [xb, hi(xb)], [xa, hi(xa)]];
+
+  // Outer shell of the main mass: the side walls of every depth slice plus only the exposed
+  // faces between slices, so there are no hidden inner faces to flicker through at grazing angles.
+  function massGeometry(layers, caps) {
+    const pos = [];
+    const tri = (a, b, c) => pos.push(...a, ...b, ...c);
+    const ccw = (poly) => (THREE.ShapeUtils.isClockWise(poly.map(([x, y]) => new THREE.Vector2(x, y))) ? [...poly].reverse() : poly);
+    for (const [z0, z1, raw] of layers) {
+      const poly = ccw(raw);
+      poly.forEach((p, i) => {
+        const q = poly[(i + 1) % poly.length];
+        const a = [p[0], p[1], z0], b = [q[0], q[1], z0], c = [q[0], q[1], z1], d = [p[0], p[1], z1];
+        tri(a, c, b);
+        tri(a, d, c);
+      });
+    }
+    for (const [z, raw, facing] of caps) {
+      const poly = ccw(raw);
+      for (const [i, j, k] of THREE.ShapeUtils.triangulateShape(poly.map(([x, y]) => new THREE.Vector2(x, y)), [])) {
+        let a = poly[i], b = poly[j], c = poly[k];
+        const area = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+        if (area > 0 !== facing > 0) [b, c] = [c, b];
+        tri([a[0], a[1], z], [b[0], b[1], z], [c[0], c[1], z]);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  // Clean outline of the stacked main mass: faces between slices show only where the outline changes,
+  // and depth edges only at real corners, so no seams are drawn where two slices meet.
+  function massOutline(layers) {
+    const pts = [];
+    const key = (p) => p[0].toFixed(3) + ',' + p[1].toFixed(3);
+    const segments = (poly) => {
+      const m = new Map();
+      poly.forEach((p, i) => {
+        const q = poly[(i + 1) % poly.length];
+        m.set([key(p), key(q)].sort().join('|'), [p, q]);
+      });
+      return m;
+    };
+    const seg = (p, z0, q, z1) => pts.push(p[0], p[1], z0, q[0], q[1], z1);
+    const outlines = [new Map(), ...layers.map((l) => segments(l[2])), new Map()];
+    const planes = [layers[0][0], ...layers.map((l) => l[1])];
+    planes.forEach((z, i) => {
+      const a = outlines[i], b = outlines[i + 1];
+      for (const [k, [p, q]] of a) if (!b.has(k)) seg(p, z, q, z);
+      for (const [k, [p, q]] of b) if (!a.has(k)) seg(p, z, q, z);
+    });
+    for (const [z0, z1, poly] of layers) {
+      poly.forEach((p, i) => {
+        const a = poly[(i + poly.length - 1) % poly.length], c = poly[(i + 1) % poly.length];
+        const turn = (p[0] - a[0]) * (c[1] - p[1]) - (p[1] - a[1]) * (c[0] - p[0]);
+        if (Math.abs(turn) > 1e-6) seg(p, z0, p, z1);
+      });
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    return g;
+  }
+
+  /* ---------- Building ---------- */
+  let building = null, occluders = [];
+  const anchors = { louvre: new THREE.Vector3(), balcony: new THREE.Vector3(), rail: new THREE.Vector3(), planter: new THREE.Vector3() };
+
+  function build() {
+    const { D, DB } = state;
+    if (building) {
+      scene.remove(building);
+      building.traverse((o) => o.geometry && o.geometry.dispose());
+    }
+    building = new THREE.Group();
+    const solids = new THREE.Group(), lines = new THREE.Group();
+    building.add(solids, lines);
+    const add = (mesh, outline = true) => {
+      solids.add(mesh);
+      if (outline) lines.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), M.line));
+      return mesh;
+    };
+
+    // Main mass in depth slices: louvre recess, planter recess, balcony, then the solid back.
+    const { O, E, Q, C, B, A, TR, T1a, T1b, T1c } = P;
+    const layers = [
+      [0, -R1, [O, E, Q, C, B, A, TR, T1b, T1c]],
+      [-R1, -R2, [O, E, Q, C, B, A, TR, T1b, T1a, T1c]],
+      [-R2, -DB, [O, E, C, B, A, TR, T1b, T1a, T1c]],
+      [-DB, -D, [O, E, C, A, TR, T1b, T1a, T1c]],
+    ];
+    const caps = [
+      [0, layers[0][2], 1],          // facade
+      [-R1, [T1b, T1a, T1c], 1],     // wall behind the louvres
+      [-R2, [Q, C, E], 1],           // wall behind the planters
+      [-DB, [B, C, A], 1],           // back wall of the balcony
+      [-D, layers[3][2], -1],        // rear facade
+    ];
+    const mass = new THREE.Mesh(massGeometry(layers, caps), M.plaster);
+    mass.castShadow = mass.receiveShadow = true;
+    add(mass, false);
+    lines.add(new THREE.LineSegments(massOutline(layers), M.line));
+
+    // Brown wooden louvres in the top-left triangle; the gaps are the recessed wall.
+    for (const [x0, x1] of LOUVRES) add(prism([[x0, hypY(x0)], [x1, hypY(x1)], [x1, H], [x0, H]], 0.06, -R1, M.wood));
+
+    // Grey wooden planters in the bottom-right triangle, with soil on top.
+    for (const [y0, y1] of PLANTERS) {
+      add(prism([[diagX(y0), y0], [W, y0], [W, y1], [diagX(y1), y1]], 0.32, -R2, M.woodGray));
+      add(box(diagX(y1) + 0.08, W - 0.08, y1 - 0.05, y1 + 0.02, 0.24, -R2 + 0.08, M.soil), false);
+    }
+
+    // Wooden railing: flat top rail, slats standing on the sloped balcony floor.
+    const RW = 0.15, STEP = 0.42;
+    for (let x = railX0 + 0.22; x + RW < W - 0.16; x += STEP) {
+      add(prism(band(x, x + RW, floorY, () => RAIL_Y), -0.07, -0.16, M.wood));
+    }
+    add(box(railX0, W - 0.02, RAIL_Y - 0.09, RAIL_Y + 0.02, -0.03, -0.2, M.wood));
+    add(box(W - 0.15, W - 0.02, floorY(W - 0.02), RAIL_Y, -0.03, -0.2, M.wood));
+    for (let z = -0.5; z > -DB + 0.3; z -= STEP) add(box(W - 0.13, W - 0.05, floorY(W - 0.05), RAIL_Y, z, z - RW, M.wood));
+    add(box(W - 0.15, W - 0.02, RAIL_Y - 0.09, RAIL_Y + 0.02, -0.2, -DB + 0.02, M.wood));
+
+    // Glazed doors on the back wall of the balcony (not in the sketch).
+    const gz = -DB, gx0 = 5.3, gx1 = W - 0.25, FR = 0.045;
+    const gTop = (x) => ceilY(x) - 0.12, gBot = (x) => floorY(x) + 0.03;
+    const glass = add(prism(band(gx0, gx1, gBot, gTop), gz + 0.04, gz + 0.01, M.glass), false);
+    glass.castShadow = false;
+    for (let i = 0; i <= 4; i++) {
+      const x = gx0 + ((gx1 - gx0) * i) / 4;
+      add(prism(band(x - FR, x + FR, gBot, gTop), gz + 0.08, gz + 0.01, M.frame));
+    }
+    add(prism(band(gx0 - FR, gx1 + FR, (x) => gTop(x) - FR, (x) => gTop(x) + FR), gz + 0.08, gz + 0.01, M.frame));
+    add(prism(band(gx0 - FR, gx1 + FR, (x) => gBot(x) - 0.03, (x) => gBot(x) + 2 * FR), gz + 0.08, gz + 0.01, M.frame));
+
+    // Plants: bushes on each planter, trailing stems over the front lip into the empty band below.
+    const r = rng(42);
+    const greens = ['#3d6a33', '#4c7d3b', '#5c8f44', '#6e9f4d', '#37592d', '#7fae55'].map((c) => new THREE.Color(c));
+    const leaves = [];
+    const leaf = (x, y, z, s) => leaves.push([x, Math.max(y, s * 0.6), z, s, greens[Math.floor(r() * greens.length)], r() * Math.PI]);
+    const reach = [0.3, 0.85, 0.8];   // room above each planter
+    const trail = [0.95, 0.8, 0.15];  // how far stems fall below each planter
+    PLANTERS.forEach(([y0, y1], i) => {
+      const xl = diagX(y1) + 0.15, xr = W - 0.12;
+      const zBack = i === 0 ? 0.02 : -R2 + 0.2;
+      const n = Math.ceil((xr - xl) * 2.4);
+      for (let k = 0; k < n; k++) {
+        const cx = xl + ((xr - xl) * (k + r())) / n, cz = zBack + (0.24 - zBack) * r();
+        const h = reach[i] * (0.55 + 0.45 * r());
+        for (let j = 0; j < 6; j++) {
+          const s = (0.1 + 0.14 * r()) * (i === 0 ? 0.75 : 1);
+          leaf(cx + (r() - 0.5) * 0.35, y1 + s * 0.4 + r() * Math.max(0, h - s * 1.4), cz + (r() - 0.5) * 0.25, s);
+        }
+      }
+      for (let x = diagX(y1) + 0.12 + r() * 0.2; x < W - 0.1; x += 0.34 + r() * 0.3) {
+        const len = (y1 - y0) * (0.5 + 0.5 * r()) + trail[i] * r() * r(), ph = r() * 6;
+        for (let t = 0; t < len; t += 0.085) {
+          const lip = Math.min(1, t / 0.12); // stems bend over the front edge before falling
+          leaf(x + Math.sin(ph + t * 3) * 0.06 + (r() - 0.5) * 0.06, y1 + 0.04 - t, 0.18 + 0.18 * lip + (r() - 0.5) * 0.05, 0.05 + 0.04 * r());
+        }
+      }
+    });
+    const foliage = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), M.leaf, leaves.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+    leaves.forEach(([x, y, z, s, col, rot], i) => {
+      q.setFromEuler(e.set(rot, rot * 1.7, rot * 0.3));
+      foliage.setMatrixAt(i, m4.compose(v.set(x, y, z), q, sc.set(s, s * 0.9, s)));
+      foliage.setColorAt(i, col);
+    });
+    foliage.castShadow = foliage.receiveShadow = true;
+    solids.add(foliage);
+
+    scene.add(building);
+    occluders = solids.children.filter((o) => !o.isInstancedMesh);
+    anchors.louvre.set(2.25, 14.7, 0.07);
+    anchors.balcony.set(7.4, 7.3, -DB * 0.45);
+    anchors.rail.set(8.7, RAIL_Y + 0.02, -0.1);
+    anchors.planter.set(9.3, 2.25, 0.33);
+    sun.target.position.set(W / 2, H / 2, -D / 2);
+    sun.position.copy(sun.target.position).add(new THREE.Vector3(-14, 24, 22));
+  }
+
+  /* ---------- Views ---------- */
+  function preset(name) {
+    const aspect = (app.clientWidth - panelShift) / Math.max(app.clientHeight, 1); // area not covered by the panel
+    const c = new THREE.Vector3(W / 2, H / 2 - 1, -state.D / 2);
+    const R = 0.5 * Math.hypot(W, H, state.D);
+    const halfAngles = (fov) => {
+      const vf = THREE.MathUtils.degToRad(fov / 2);
+      return [vf, Math.atan(Math.tan(vf) * aspect)];
+    };
+    const orbit = (dir, fov) => {
+      const [vf, hf] = halfAngles(fov);
+      return { fov, target: c, pos: c.clone().add(new THREE.Vector3(...dir).normalize().multiplyScalar((0.96 * R) / Math.sin(Math.min(vf, hf)))) };
+    };
+    if (name === 'front') {
+      const fov = 14, [vf, hf] = halfAngles(fov);
+      const d = Math.max((H / 2 + 1.8) / Math.tan(vf), (W / 2 + 1.4) / Math.tan(hf));
+      const t = new THREE.Vector3(W / 2, H / 2 - 0.7, 0);
+      return { fov, target: t, pos: t.clone().add(new THREE.Vector3(0, 0.6, d)) };
+    }
+    if (name === 'side') return orbit([0.93, 0.2, 0.3], 35);
+    if (name === 'balcony') {
+      const t = new THREE.Vector3(7.2, 6.8, -state.DB * 0.5);
+      return { fov: 42, target: t, pos: t.clone().add(new THREE.Vector3(5.5, 1.4, 7.5)) };
+    }
+    return orbit([0.55, 0.3, 0.78], 35);
+  }
+
+  let tween = null;
+  const off = new THREE.Vector3();
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  function goTo(name, instant = false) {
+    const to = preset(name);
+    if (instant || reduceMotion) {
+      tween = null;
+      controls.target.copy(to.target);
+      camera.position.copy(to.pos);
+      camera.fov = to.fov;
+      camera.updateProjectionMatrix();
+      controls.update();
+      return;
+    }
+    const s0 = new THREE.Spherical().setFromVector3(off.subVectors(camera.position, controls.target));
+    const s1 = new THREE.Spherical().setFromVector3(off.subVectors(to.pos, to.target));
+    const dTheta = Math.atan2(Math.sin(s1.theta - s0.theta), Math.cos(s1.theta - s0.theta));
+    tween = { start: performance.now(), s0, s1, dTheta, tgt0: controls.target.clone(), tgt1: to.target.clone(), f0: camera.fov, f1: to.fov };
+  }
+  function stepTween(now) {
+    const k = Math.min(1, (now - tween.start) / 1200), e = ease(k), L = THREE.MathUtils.lerp;
+    const s = new THREE.Spherical(
+      Math.exp(L(Math.log(tween.s0.radius), Math.log(tween.s1.radius), e)),
+      L(tween.s0.phi, tween.s1.phi, e),
+      tween.s0.theta + tween.dTheta * e,
+    );
+    controls.target.lerpVectors(tween.tgt0, tween.tgt1, e);
+    camera.position.setFromSpherical(s).add(controls.target);
+    camera.fov = L(tween.f0, tween.f1, e);
+    camera.updateProjectionMatrix();
+    if (k >= 1) tween = null;
+  }
+
+  const viewButtons = [...document.querySelectorAll('[data-view]')];
+  const setPressed = (name) => viewButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === name)));
+  viewButtons.forEach((b) => b.addEventListener('click', () => { introPending = false; setPressed(b.dataset.view); goTo(b.dataset.view); }));
+  controls.addEventListener('start', () => { introPending = false; tween = null; setPressed(null); });
+
+  function toggle(sel, fn) {
+    const b = $(sel);
+    b.addEventListener('click', () => {
+      const on = b.getAttribute('aria-pressed') !== 'true';
+      b.setAttribute('aria-pressed', String(on));
+      fn(on);
+    });
+  }
+  toggle('#tLines', (on) => { M.line.visible = on; });
+  toggle('#tTags', (on) => { state.tags = on; $('#tags').hidden = !on; });
+  toggle('#tSpin', (on) => { controls.autoRotate = on; });
+
+  let rebuildQueued = false;
+  function syncDepths() {
+    state.D = +depthIn.value;
+    bdepthIn.max = String(state.D - 1.5);
+    state.DB = Math.min(+bdepthIn.value, state.D - 1.5);
+    bdepthIn.value = String(state.DB);
+    $('#depthOut').textContent = fa(state.D * CELL_M) + ' متر';
+    $('#bdepthOut').textContent = fa(state.DB * CELL_M) + ' متر';
+  }
+  function onDepth() {
+    syncDepths();
+    if (rebuildQueued) return;
+    rebuildQueued = true;
+    requestAnimationFrame(() => { rebuildQueued = false; build(); });
+  }
+  depthIn.addEventListener('input', onDepth);
+  bdepthIn.addEventListener('input', onDepth);
+
+  /* ---------- Annotations ---------- */
+  const tagEls = [...document.querySelectorAll('.tag')].map((el) => ({ el, key: el.dataset.key }));
+  const ray = new THREE.Raycaster(), pv = new THREE.Vector3(), dir = new THREE.Vector3();
+  function placeTags(checkOcclusion) {
+    const w = app.clientWidth, h = app.clientHeight;
+    for (const t of tagEls) {
+      const a = anchors[t.key];
+      pv.copy(a).project(camera);
+      const on = pv.z < 1 && Math.abs(pv.x) < 1.02 && Math.abs(pv.y) < 1.02;
+      t.el.hidden = !on;
+      if (!on) continue;
+      const x = (pv.x * 0.5 + 0.5) * w, y = (-pv.y * 0.5 + 0.5) * h;
+      const flip = x > w * 0.62;
+      t.el.classList.toggle('flip', flip);
+      t.el.style.transform = flip
+        ? `translate(${x + 5}px, ${y}px) translate(-100%, -50%)`
+        : `translate(${x - 5}px, ${y}px) translateY(-50%)`;
+      if (checkOcclusion) {
+        const d = camera.position.distanceTo(a);
+        ray.set(camera.position, dir.subVectors(a, camera.position).normalize());
+        ray.far = d - 0.2;
+        t.el.classList.toggle('behind', ray.intersectObjects(occluders, false).length > 0);
+      }
+    }
+  }
+
+  /* ---------- Theme ---------- */
+  function applyTheme() {
+    const cs = getComputedStyle(document.documentElement);
+    const token = (n) => cs.getPropertyValue(n).trim();
+    scene.background.set(token('--scene-bg'));
+    scene.fog.color.set(token('--scene-bg'));
+    drawGrid(token('--scene-ground'), token('--scene-grid'));
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  /* ---------- Run ---------- */
+  // On wide screens the open panel covers the right side, so the image is shifted
+  // left by the panel's width to keep the model centred in the free area.
+  const info = $('#info');
+  let panelShift = 0, viewShift = 0;
+  const measureShift = () => { panelShift = info.open && app.clientWidth >= 820 ? info.offsetWidth + 16 : 0; };
+  function applyProjection() {
+    const w = app.clientWidth, h = Math.max(app.clientHeight, 1), s = Math.round(viewShift);
+    camera.aspect = (w + s) / h;
+    if (s > 0) camera.setViewOffset(w + s, h, s, 0, w, h); else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+  }
+  function resize() {
+    renderer.setSize(app.clientWidth, app.clientHeight, false);
+    measureShift();
+    applyProjection();
+  }
+  new ResizeObserver(resize).observe(app);
+  info.addEventListener('toggle', measureShift);
+
+  let frame = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (Math.abs(panelShift - viewShift) > 0.5) {
+      viewShift = reduceMotion ? panelShift : viewShift + (panelShift - viewShift) * 0.14;
+      applyProjection();
+    }
+    if (tween) stepTween(now);
+    controls.update();
+    renderer.render(scene, camera);
+    if (state.tags) placeTags(frame++ % 8 === 0);
+  }
+
+  applyTheme();
+  syncDepths();
+  build();
+  resize();
+  viewShift = panelShift;
+  applyProjection();
+
+  // Open on the elevation, as drawn, then swing round to show the depth.
+  let introPending = !reduceMotion;
+  if (introPending) {
+    goTo('front', true);
+    setPressed('front');
+    setTimeout(() => { if (introPending) { introPending = false; setPressed('three'); goTo('three'); } }, 900);
+  } else {
+    goTo('three', true);
+    setPressed('three');
+  }
+  requestAnimationFrame(loop);
+  statusEl.hidden = true;
+  window.__modelReady = true;
+</script>
+</html>
