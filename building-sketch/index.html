@@ -115,6 +115,7 @@
   .sw-gray { background: repeating-linear-gradient(0deg, #86837a 0 4px, #9d9a90 4px 5px); }
   .sw-plant { background: radial-gradient(circle at 30% 35%, #74a552 0 4px, transparent 4.5px), radial-gradient(circle at 70% 70%, #5c8f44 0 5px, transparent 5.5px), #3d6a33; }
   .sw-plaster { background: #ece5d8; }
+  .sw-door { background: linear-gradient(90deg, #2c2e2b 0 3px, #6f8c99 3px 9px, #2c2e2b 9px 11px, #6f8c99 11px 17px, #2c2e2b 17px); }
   .sw-glass { background: linear-gradient(135deg, #8aa3ad, #34505c); }
 
   .depths { display: grid; gap: 10px; }
@@ -171,6 +172,7 @@
     <div class="tag" data-key="louvre" hidden><i class="dot"></i><i class="stem"></i><span class="txt">لوورهای چوبی</span></div>
     <div class="tag" data-key="balcony" hidden><i class="dot"></i><i class="stem"></i><span class="txt">بالکن بزرگ</span></div>
     <div class="tag" data-key="rail" hidden><i class="dot"></i><i class="stem"></i><span class="txt">نردهٔ چوبی</span></div>
+    <div class="tag" data-key="door" hidden><i class="dot"></i><i class="stem"></i><span class="txt">در هوشمند با چشمی</span></div>
     <div class="tag" data-key="planter" hidden><i class="dot"></i><i class="stem"></i><span class="txt">گلدان‌های چوبی و گیاه</span></div>
   </div>
 
@@ -187,6 +189,7 @@
         <li><i class="sw sw-gray"></i><span><b>چوب طوسی</b>گلدان‌های باریک و کمی خوابیده در مثلث پایین.</span></li>
         <li><i class="sw sw-plant"></i><span><b>گیاهان سبز</b>نوارهای خالی بین گلدان‌ها را پر می‌کنند.</span></li>
         <li><i class="sw sw-plaster"></i><span><b>رنگ اصلی ساختمان</b>بدنه و همهٔ فرورفتگی‌ها.</span></li>
+        <li><i class="sw sw-door"></i><span><b>در هوشمند</b>درِ کشویی شیشه‌ای ورودی. چشمیِ بالای در حرکت را می‌بیند: وقتی کسی وارد محدودهٔ سبز جلوی در شود چراغش سبز می‌شود و دو لنگه خودکار کنار می‌روند.</span></li>
         <li><i class="sw sw-glass"></i><span><b>شیشه</b>درِ بالکن. در طرح نبود؛ برای اینکه بالکن خوانا باشد اضافه شده.</span></li>
       </ul>
 
@@ -213,6 +216,7 @@
       <button type="button" data-view="three" aria-pressed="false">سه‌رخ</button>
       <button type="button" data-view="side" aria-pressed="false">سمت راست</button>
       <button type="button" data-view="balcony" aria-pressed="false">داخل بالکن</button>
+      <button type="button" data-view="door" aria-pressed="false">در ورودی</button>
     </div>
     <div class="toggles">
       <button type="button" id="tLines" aria-pressed="true">خطوط اسکچ</button>
@@ -482,7 +486,7 @@
 
   /* ---------- Building ---------- */
   let building = null, occluders = [];
-  const anchors = { louvre: new THREE.Vector3(), balcony: new THREE.Vector3(), rail: new THREE.Vector3(), planter: new THREE.Vector3() };
+  const anchors = { louvre: new THREE.Vector3(), balcony: new THREE.Vector3(), rail: new THREE.Vector3(), planter: new THREE.Vector3(), door: new THREE.Vector3(1.8, 3.0, 0.2) };
 
   function build() {
     const { D, DB } = state;
@@ -608,6 +612,55 @@
     sun.position.copy(sun.target.position).add(new THREE.Vector3(-14, 24, 22));
   }
 
+  /* ---------- Smart entrance: sliding glass doors with a motion sensor ---------- */
+  const DX0 = 1.2, DX1 = 3.6, DH = 2.3, DMID = (DX0 + DX1) / 2, LEAF = (DX1 - DX0) / 2, SENSE = 3.4;
+  const entrance = new THREE.Group();
+  const eAdd = (mesh, outline = true) => {
+    entrance.add(mesh);
+    if (outline) entrance.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), M.line));
+    return mesh;
+  };
+  eAdd(box(DX0 - 0.14, DX0, 0, DH + 0.4, 0.12, -0.02, M.frame));
+  eAdd(box(DX1, DX1 + 0.14, 0, DH + 0.4, 0.12, -0.02, M.frame));
+  eAdd(box(DX0, DX1, DH, DH + 0.4, 0.12, -0.02, M.frame)); // header that houses the sliding gear
+  eAdd(box(DX0, DX1, 0, DH, 0.004, -0.01, solid({ color: 0x1b2125, roughness: 0.6 })), false); // lobby behind the glass
+  const leaves2 = [-1, 1].map((side) => {
+    const g = new THREE.Group();
+    const x0 = side < 0 ? DX0 : DMID, x1 = x0 + LEAF;
+    const pane = eAdd(box(x0 + 0.04, x1 - 0.04, 0.04, DH - 0.04, 0.07, 0.04, M.glass), false);
+    pane.castShadow = false;
+    g.add(pane);
+    for (const b of [box(x0, x0 + 0.05, 0, DH, 0.08, 0.03, M.frame), box(x1 - 0.05, x1, 0, DH, 0.08, 0.03, M.frame), box(x0, x1, 0, 0.06, 0.08, 0.03, M.frame)]) g.add(b);
+    entrance.add(g);
+    return { g, side };
+  });
+  // Sensor ("smart eye") centred on the header; its lens changes colour when someone is detected.
+  eAdd(box(DMID - 0.3, DMID + 0.3, DH + 0.1, DH + 0.3, 0.22, 0.1, M.frame));
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xd99a2b, emissiveIntensity: 1.2, roughness: 0.3 });
+  const lens = new THREE.Mesh(new THREE.SphereGeometry(0.06, 20, 14), lensMat);
+  lens.position.set(DMID, DH + 0.2, 0.23);
+  entrance.add(lens);
+  // Detection zone drawn on the pavement
+  const zoneMat = new THREE.MeshBasicMaterial({ color: 0x4fae6a, transparent: true, opacity: 0.08, depthWrite: false });
+  const zone = new THREE.Mesh(new THREE.CircleGeometry(SENSE, 48, Math.PI, Math.PI), zoneMat);
+  zone.rotation.x = -Math.PI / 2;
+  zone.position.set(DMID, 0.012, 0.1);
+  entrance.add(zone);
+  entrance.traverse((o) => { if (o.isMesh && o !== zone) o.castShadow = o.receiveShadow = true; });
+  scene.add(entrance);
+  let doorOpen = 0;
+  const idleLens = new THREE.Color(0xd99a2b), seenLens = new THREE.Color(0x3fd46b);
+  function stepEntrance(now) {
+    const t = now / 1000;
+    const pz = reduceMotion ? 1.6 : 1.0 + 4.2 * (0.5 + 0.5 * Math.cos(t * 0.45)); // figure walks up to the door and back
+    person.position.set(DMID, reduceMotion ? 0 : Math.abs(Math.sin(t * 5)) * 0.03, pz);
+    const seen = pz < SENSE;
+    doorOpen += ((seen ? 1 : 0) - doorOpen) * (reduceMotion ? 1 : 0.06);
+    for (const { g, side } of leaves2) g.position.x = side * doorOpen * LEAF * 0.92;
+    lensMat.emissive.copy(seen ? seenLens : idleLens);
+    zoneMat.opacity = seen ? 0.2 : 0.07;
+  }
+
   /* ---------- Views ---------- */
   function preset(name) {
     const aspect = (app.clientWidth - panelShift) / Math.max(app.clientHeight, 1); // area not covered by the panel
@@ -626,6 +679,10 @@
       const d = Math.max((H / 2 + 1.8) / Math.tan(vf), (W / 2 + 1.4) / Math.tan(hf));
       const t = new THREE.Vector3(W / 2, H / 2 - 0.7, 0);
       return { fov, target: t, pos: t.clone().add(new THREE.Vector3(0, 0.6, d)) };
+    }
+    if (name === 'door') {
+      const t = new THREE.Vector3(DMID, 1.4, 0);
+      return { fov: 40, target: t, pos: t.clone().add(new THREE.Vector3(4.5, 1.8, 8.5)) };
     }
     if (name === 'side') return orbit([0.93, 0.2, 0.3], 35);
     if (name === 'balcony') {
@@ -767,6 +824,7 @@
       viewShift = reduceMotion ? panelShift : viewShift + (panelShift - viewShift) * 0.14;
       applyProjection();
     }
+    stepEntrance(now);
     if (tween) stepTween(now);
     controls.update();
     renderer.render(scene, camera);
