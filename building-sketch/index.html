@@ -184,7 +184,7 @@
 
       <ul class="legend">
         <li><i class="sw sw-wood"></i><span><b>چوب قهوه‌ای</b>لوورهای عمودی گوشهٔ بالا و نردهٔ بالکن. فاصلهٔ بین تیغه‌ها فرورفتگی به رنگ ساختمان است.</span></li>
-        <li><i class="sw sw-gray"></i><span><b>چوب طوسی</b>گلدان‌های افقی در مثلث پایین.</span></li>
+        <li><i class="sw sw-gray"></i><span><b>چوب طوسی</b>گلدان‌های باریک و کمی خوابیده در مثلث پایین.</span></li>
         <li><i class="sw sw-plant"></i><span><b>گیاهان سبز</b>نوارهای خالی بین گلدان‌ها را پر می‌کنند.</span></li>
         <li><i class="sw sw-plaster"></i><span><b>رنگ اصلی ساختمان</b>بدنه و همهٔ فرورفتگی‌ها.</span></li>
         <li><i class="sw sw-glass"></i><span><b>شیشه</b>درِ بالکن. در طرح نبود؛ برای اینکه بالکن خوانا باشد اضافه شده.</span></li>
@@ -279,10 +279,13 @@
   const railX0 = P.B[0] + ((RAIL_Y - P.B[1]) * (P.C[0] - P.B[0])) / (P.C[1] - P.B[1]);
   P.R0 = [railX0, RAIL_Y];
   const diagX = (y) => P.E[0] + ((P.R0[0] - P.E[0]) * y) / P.R0[1]; // edge of the planter triangle
-  P.Q = [diagX(P.C[1]), P.C[1]];
+  const SLAB_Y = 4.8; // underside of the balcony slab = top of the planter recess
+  P.Q = [diagX(SLAB_Y), SLAB_Y];
+  P.C2 = [W, SLAB_Y];
+  P.F = [P.B[0], P.C[1]]; // the balcony floor inside is flat at the level of C
 
   const LOUVRES = [[0, 0.5], [1, 1.5], [2, 2.5], [3, 3.5]];
-  const PLANTERS = [[3.95, 5], [1.7, 2.8], [0.22, 0.62]];
+  const PLANTERS = [[4.2, 4.8], [2.25, 2.85], [0.3, 0.65]];
 
   const depthIn = $('#depth'), bdepthIn = $('#bdepth');
   const state = { D: +depthIn.value, DB: +bdepthIn.value, tags: true };
@@ -497,18 +500,20 @@
     };
 
     // Main mass in depth slices: louvre recess, planter recess, balcony, then the solid back.
-    const { O, E, Q, C, B, A, TR, T1a, T1b, T1c } = P;
+    // The sloped cut stays only in the front parapet (depth R1); behind it the balcony floor is flat.
+    const { O, E, Q, C, C2, F, B, A, TR, T1a, T1b, T1c } = P;
     const layers = [
-      [0, -R1, [O, E, Q, C, B, A, TR, T1b, T1c]],
-      [-R1, -R2, [O, E, Q, C, B, A, TR, T1b, T1a, T1c]],
-      [-R2, -DB, [O, E, C, B, A, TR, T1b, T1a, T1c]],
-      [-DB, -D, [O, E, C, A, TR, T1b, T1a, T1c]],
+      [0, -R1, [O, E, Q, C2, C, B, A, TR, T1b, T1c]],
+      [-R1, -R2, [O, E, Q, C2, C, F, B, A, TR, T1b, T1a, T1c]],
+      [-R2, -DB, [O, E, C2, C, F, B, A, TR, T1b, T1a, T1c]],
+      [-DB, -D, [O, E, C2, C, A, TR, T1b, T1a, T1c]],
     ];
     const caps = [
       [0, layers[0][2], 1],          // facade
       [-R1, [T1b, T1a, T1c], 1],     // wall behind the louvres
-      [-R2, [Q, C, E], 1],           // wall behind the planters
-      [-DB, [B, C, A], 1],           // back wall of the balcony
+      [-R1, [B, F, C], -1],          // inner face of the sloped parapet
+      [-R2, [Q, C2, E], 1],          // wall behind the planters
+      [-DB, [F, C, A, B], 1],        // back wall of the balcony
       [-D, layers[3][2], -1],        // rear facade
     ];
     const mass = new THREE.Mesh(massGeometry(layers, caps), M.plaster);
@@ -520,9 +525,18 @@
     for (const [x0, x1] of LOUVRES) add(prism([[x0, hypY(x0)], [x1, hypY(x1)], [x1, H], [x0, H]], 0.06, -R1, M.wood));
 
     // Grey wooden planters in the bottom-right triangle, with soil on top.
+    // Slim planters whose front leans back into the recess, barely standing proud of the facade.
+    const faceZ = (y0, y1, y) => 0.08 - (0.33 * (y - y0)) / (y1 - y0);
     for (const [y0, y1] of PLANTERS) {
-      add(prism([[diagX(y0), y0], [W, y0], [W, y1], [diagX(y1), y1]], 0.32, -R2, M.woodGray));
-      add(box(diagX(y1) + 0.08, W - 0.08, y1 - 0.05, y1 + 0.02, 0.24, -R2 + 0.08, M.soil), false);
+      const x0 = diagX(y0) + 0.02;
+      const shape = new THREE.Shape([[-R2, y0], [0.08, y0], [-0.25, y1], [-R2, y1]].map(([u, w]) => new THREE.Vector2(u, w)));
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: W - x0, bevelEnabled: false });
+      geo.rotateY(-Math.PI / 2);
+      geo.translate(W, 0, 0);
+      const pl = new THREE.Mesh(geo, M.woodGray);
+      pl.castShadow = pl.receiveShadow = true;
+      add(pl);
+      add(box(x0 + 0.06, W - 0.06, y1 - 0.04, y1 + 0.02, -0.28, -R2 + 0.06, M.soil), false);
     }
 
     // Wooden railing: flat top rail, slats standing on the sloped balcony floor.
@@ -532,12 +546,12 @@
     }
     add(box(railX0, W - 0.02, RAIL_Y - 0.09, RAIL_Y + 0.02, -0.03, -0.2, M.wood));
     add(box(W - 0.15, W - 0.02, floorY(W - 0.02), RAIL_Y, -0.03, -0.2, M.wood));
-    for (let z = -0.5; z > -DB + 0.3; z -= STEP) add(box(W - 0.13, W - 0.05, floorY(W - 0.05), RAIL_Y, z, z - RW, M.wood));
+    for (let z = -0.5; z > -DB + 0.3; z -= STEP) add(box(W - 0.13, W - 0.05, C[1], RAIL_Y, z, z - RW, M.wood));
     add(box(W - 0.15, W - 0.02, RAIL_Y - 0.09, RAIL_Y + 0.02, -0.2, -DB + 0.02, M.wood));
 
     // Glazed doors on the back wall of the balcony (not in the sketch).
     const gz = -DB, gx0 = 5.3, gx1 = W - 0.25, FR = 0.045;
-    const gTop = (x) => ceilY(x) - 0.12, gBot = (x) => floorY(x) + 0.03;
+    const gTop = (x) => ceilY(x) - 0.12, gBot = () => C[1] + 0.03;
     const glass = add(prism(band(gx0, gx1, gBot, gTop), gz + 0.04, gz + 0.01, M.glass), false);
     glass.castShadow = false;
     for (let i = 0; i <= 4; i++) {
@@ -552,25 +566,25 @@
     const greens = ['#3d6a33', '#4c7d3b', '#5c8f44', '#6e9f4d', '#37592d', '#7fae55'].map((c) => new THREE.Color(c));
     const leaves = [];
     const leaf = (x, y, z, s) => leaves.push([x, Math.max(y, s * 0.6), z, s, greens[Math.floor(r() * greens.length)], r() * Math.PI]);
-    const reach = [0.3, 0.85, 0.8];   // room above each planter
-    const trail = [0.95, 0.8, 0.15];  // how far stems fall below each planter
+    const reach = [0.35, 1.15, 1.05];   // room above each planter
+    const trail = [1.05, 1.1, 0.25];  // how far stems fall below each planter
     PLANTERS.forEach(([y0, y1], i) => {
       const xl = diagX(y1) + 0.15, xr = W - 0.12;
-      const zBack = i === 0 ? 0.02 : -R2 + 0.2;
-      const n = Math.ceil((xr - xl) * 2.4);
+      const zBack = i === 0 ? 0.02 : -R2 + 0.15, zFront = i === 0 ? 0.24 : 0.05;
+      const n = Math.ceil((xr - xl) * 5);
       for (let k = 0; k < n; k++) {
-        const cx = xl + ((xr - xl) * (k + r())) / n, cz = zBack + (0.24 - zBack) * r();
+        const cx = xl + ((xr - xl) * (k + r())) / n, cz = zBack + (zFront - zBack) * r();
         const h = reach[i] * (0.55 + 0.45 * r());
-        for (let j = 0; j < 6; j++) {
+        for (let j = 0; j < 8; j++) {
           const s = (0.1 + 0.14 * r()) * (i === 0 ? 0.75 : 1);
           leaf(cx + (r() - 0.5) * 0.35, y1 + s * 0.4 + r() * Math.max(0, h - s * 1.4), cz + (r() - 0.5) * 0.25, s);
         }
       }
-      for (let x = diagX(y1) + 0.12 + r() * 0.2; x < W - 0.1; x += 0.34 + r() * 0.3) {
+      for (let x = diagX(y1) + 0.12 + r() * 0.2; x < W - 0.1; x += 0.16 + r() * 0.14) {
         const len = (y1 - y0) * (0.5 + 0.5 * r()) + trail[i] * r() * r(), ph = r() * 6;
         for (let t = 0; t < len; t += 0.085) {
-          const lip = Math.min(1, t / 0.12); // stems bend over the front edge before falling
-          leaf(x + Math.sin(ph + t * 3) * 0.06 + (r() - 0.5) * 0.06, y1 + 0.04 - t, 0.18 + 0.18 * lip + (r() - 0.5) * 0.05, 0.05 + 0.04 * r());
+          const y = y1 + 0.04 - t, fz = faceZ(y0, y1, Math.max(y0, Math.min(y1, y))); // follow the leaning front
+          leaf(x + Math.sin(ph + t * 3) * 0.07 + (r() - 0.5) * 0.08, y, fz + 0.08 + (r() - 0.5) * 0.06, 0.06 + 0.05 * r());
         }
       }
     });
@@ -589,7 +603,7 @@
     anchors.louvre.set(2.25, 14.7, 0.07);
     anchors.balcony.set(7.4, 7.3, -DB * 0.45);
     anchors.rail.set(8.7, RAIL_Y + 0.02, -0.1);
-    anchors.planter.set(9.3, 2.25, 0.33);
+    anchors.planter.set(9.4, 2.4, 0.12);
     sun.target.position.set(W / 2, H / 2, -D / 2);
     sun.position.copy(sun.target.position).add(new THREE.Vector3(-14, 24, 22));
   }
